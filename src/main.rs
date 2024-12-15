@@ -274,16 +274,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     let results = find_optimal_k(&data, max_k, max_iterations);
     plot_elbow_method(&results)?;
 
-    let k = 5; // Adjust as needed
+    let k = 3; // Adjust as needed
     println!("Running K-means clustering with k = {}...", k);
 
 // Step 1: Select the relevant columns for clustering
-let selected_columns = vec![1, 3, 10]; // Indices for 'volatile acidity', 'residual sugar', and 'alcohol'
+let selected_columns = vec![3, 4, 7, 10]; // Indices for 'volatile acidity', 'residual sugar', and 'alcohol'
 let filtered_data = filter_columns(&data, &selected_columns);
 // Step 2: Perform clustering on the filtered dataset
 let (centroids, assignments) = k_means(&filtered_data, k, max_iterations);
 // Step 3: Visualize clusters using the first two filtered features
-plot_clusters(&filtered_data, &assignments, &centroids, 0, 1, "clusters_filtered.png")?;
+plot_clusters(&filtered_data, &assignments, &centroids, 0, 1, "clusters_density_sugar.png")?;
+plot_clusters(&filtered_data, &assignments, &centroids, 2, 3, "clusters_alcohol_chlorides.png")?;
 
     Ok(())
 }
