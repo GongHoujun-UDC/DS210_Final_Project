@@ -1,5 +1,6 @@
 use csv::ReaderBuilder;
 use rand::seq::SliceRandom;
+use rand::Rng;
 use rand::thread_rng;
 use std::error::Error;
 use plotters::prelude::*;
@@ -18,13 +19,8 @@ fn k_means(data: &[Vec<f64>], k: usize, max_iterations: usize) -> (Vec<Vec<f64>>
     let n_samples = data.len();
     let n_features = data[0].len();
 
-    // Initialize centroids randomly
-    let mut centroids: Vec<Vec<f64>> = {
-        let mut rng = thread_rng();
-        data.choose_multiple(&mut rng, k)
-            .cloned()
-            .collect()
-    };
+    // Initialize centroids using K-means++
+    let mut centroids = initialize_centroids(data, k);
 
     let mut assignments = vec![0; n_samples];
 
@@ -68,6 +64,7 @@ fn k_means(data: &[Vec<f64>], k: usize, max_iterations: usize) -> (Vec<Vec<f64>>
 
     (centroids, assignments)
 }
+
 
 /// Calculate the within-cluster sum of squares (WCSS)
 fn calculate_wcss(data: &Vec<Vec<f64>>, centroids: &Vec<Vec<f64>>, assignments: &Vec<usize>) -> f64 {
@@ -211,6 +208,46 @@ fn normalize(data: &mut Vec<Vec<f64>>) {
     }
 }
 
+/// K-means++ initialization to select initial centroids
+fn initialize_centroids(data: &[Vec<f64>], k: usize) -> Vec<Vec<f64>> {
+    let mut rng = thread_rng(); // Create a random number generator
+    let mut centroids = Vec::new();
+
+    // Step 1: Randomly select the first centroid
+    centroids.push(data.choose(&mut rng).unwrap().clone());
+
+    // Step 2: Select the remaining centroids
+    while centroids.len() < k {
+        let mut distances: Vec<f64> = data.iter().map(|point| {
+            centroids
+                .iter()
+                .map(|centroid| euclidean_distance(point, centroid))
+                .fold(f64::INFINITY, f64::min) // Distance to the closest centroid
+        }).collect();
+
+        // Normalize distances to create a probability distribution
+        let total_distance: f64 = distances.iter().sum();
+        distances.iter_mut().for_each(|d| *d /= total_distance);
+
+        // Use a weighted random choice based on distances
+        let mut cumulative_prob: Vec<f64> = Vec::new();
+        let mut cumulative_sum = 0.0;
+        for &d in &distances {
+            cumulative_sum += d;
+            cumulative_prob.push(cumulative_sum);
+        }
+
+        let rand_value: f64 = rng.gen(); // Generate random number between 0 and 1
+        let selected_index = cumulative_prob.iter()
+            .position(|&prob| rand_value < prob)
+            .unwrap();
+        centroids.push(data[selected_index].clone());
+    }
+
+    centroids
+}
+
+
 fn main() -> Result<(), Box<dyn Error>> {
     let file_path = "winequality-white.csv";
 
@@ -227,7 +264,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let results = find_optimal_k(&data, max_k, max_iterations);
     plot_elbow_method(&results)?;
 
-    let k = 3; // Adjust as needed
+    let k = 5; // Adjust as needed
     println!("Running K-means clustering with k = {}...", k);
     let (centroids, assignments) = k_means(&data, k, max_iterations);
 
