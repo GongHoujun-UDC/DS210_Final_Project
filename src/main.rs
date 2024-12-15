@@ -127,7 +127,6 @@ fn plot_elbow_method(results: &Vec<(usize, f64)>) -> Result<(), Box<dyn Error>> 
     Ok(())
 }
 
-/// Plot the clustered data
 fn plot_clusters(
     data: &Vec<Vec<f64>>,
     assignments: &Vec<usize>,
@@ -162,17 +161,17 @@ fn plot_clusters(
         let cluster = assignments[i];
         chart.draw_series(PointSeries::of_element(
             vec![(point[x_index], point[y_index])],
-            5,
+            3,
             colors[cluster % colors.len()],
             &|coord, size, color| EmptyElement::at(coord) + Circle::new((0, 0), size, color.filled()),
         ))?;
     }
 
-    // Plot centroids
-    for (i, centroid) in centroids.iter().enumerate() {
+    // Plot centroids with reduced size
+    for centroid in centroids.iter() {
         chart.draw_series(PointSeries::of_element(
             vec![(centroid[x_index], centroid[y_index])],
-            10,
+            3, // Reduced size for centroids
             &BLACK,
             &|coord, size, color| EmptyElement::at(coord) + Circle::new((0, 0), size, color.filled()),
         ))?;
@@ -181,6 +180,7 @@ fn plot_clusters(
     println!("Cluster plot saved as '{}'.", file_name);
     Ok(())
 }
+
 
 /// Load CSV data and parse it into a vector of vectors
 fn load_csv(file_path: &str) -> Result<Vec<Vec<f64>>, Box<dyn Error>> {
@@ -200,11 +200,25 @@ fn load_csv(file_path: &str) -> Result<Vec<Vec<f64>>, Box<dyn Error>> {
     Ok(data)
 }
 
+fn normalize(data: &mut Vec<Vec<f64>>) {
+    let n_features = data[0].len();
+    for j in 0..n_features {
+        let min_val = data.iter().map(|row| row[j]).fold(f64::INFINITY, f64::min);
+        let max_val = data.iter().map(|row| row[j]).fold(f64::NEG_INFINITY, f64::max);
+        for row in data.iter_mut() {
+            row[j] = (row[j] - min_val) / (max_val - min_val);
+        }
+    }
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let file_path = "winequality-white.csv";
 
     println!("Loading data...");
-    let data = load_csv(file_path)?;
+    let mut data = load_csv(file_path)?;
+    println!("Normalizing data...");
+    normalize(&mut data);
+       
 
     let max_k = 10;
     let max_iterations = 100;
