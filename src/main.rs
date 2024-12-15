@@ -14,6 +14,13 @@ fn euclidean_distance(p1: &[f64], p2: &[f64]) -> f64 {
         .sqrt()
 }
 
+/// Filter the selected columns from the dataset
+fn filter_columns(data: &[Vec<f64>], selected_indices: &[usize]) -> Vec<Vec<f64>> {
+    data.iter()
+        .map(|row| selected_indices.iter().map(|&i| row[i]).collect())
+        .collect()
+}
+
 /// K-Means clustering algorithm
 fn k_means(data: &[Vec<f64>], k: usize, max_iterations: usize) -> (Vec<Vec<f64>>, Vec<usize>) {
     let n_samples = data.len();
@@ -197,13 +204,17 @@ fn load_csv(file_path: &str) -> Result<Vec<Vec<f64>>, Box<dyn Error>> {
     Ok(data)
 }
 
-fn normalize(data: &mut Vec<Vec<f64>>) {
+fn standardize(data: &mut Vec<Vec<f64>>) {
     let n_features = data[0].len();
     for j in 0..n_features {
-        let min_val = data.iter().map(|row| row[j]).fold(f64::INFINITY, f64::min);
-        let max_val = data.iter().map(|row| row[j]).fold(f64::NEG_INFINITY, f64::max);
+        let mean = data.iter().map(|row| row[j]).sum::<f64>() / data.len() as f64;
+        let std_dev = (data.iter()
+            .map(|row| (row[j] - mean).powi(2))
+            .sum::<f64>()
+            / data.len() as f64)
+            .sqrt();
         for row in data.iter_mut() {
-            row[j] = (row[j] - min_val) / (max_val - min_val);
+            row[j] = (row[j] - mean) / std_dev;
         }
     }
 }
@@ -254,8 +265,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("Loading data...");
     let mut data = load_csv(file_path)?;
     println!("Normalizing data...");
-    normalize(&mut data);
-       
+    standardize(&mut data);
 
     let max_k = 10;
     let max_iterations = 100;
@@ -266,9 +276,14 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let k = 5; // Adjust as needed
     println!("Running K-means clustering with k = {}...", k);
-    let (centroids, assignments) = k_means(&data, k, max_iterations);
 
-    plot_clusters(&data, &assignments, &centroids, 0, 1, "clusters.png")?;
+// Step 1: Select the relevant columns for clustering
+let selected_columns = vec![1, 3, 10]; // Indices for 'volatile acidity', 'residual sugar', and 'alcohol'
+let filtered_data = filter_columns(&data, &selected_columns);
+// Step 2: Perform clustering on the filtered dataset
+let (centroids, assignments) = k_means(&filtered_data, k, max_iterations);
+// Step 3: Visualize clusters using the first two filtered features
+plot_clusters(&filtered_data, &assignments, &centroids, 0, 1, "clusters_filtered.png")?;
 
     Ok(())
 }
